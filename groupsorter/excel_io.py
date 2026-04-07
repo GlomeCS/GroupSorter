@@ -4,14 +4,14 @@ import io
 from datetime import date, datetime
 from pathlib import Path
 
-import openpyxl
 from openpyxl import Workbook
+from openpyxl import load_workbook as _xl_load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
 from .anomaly import Person
 
 
-def load_workbook(path: str | Path, password: str | None = None) -> Workbook:
+def open_workbook(path: str | Path, password: str | None = None) -> Workbook:
     """Load an Excel workbook, decrypting it first if a password is provided.
 
     Raises:
@@ -28,12 +28,12 @@ def load_workbook(path: str | Path, password: str | None = None) -> Workbook:
                 decrypted = io.BytesIO()
                 office_file.decrypt(decrypted)
             decrypted.seek(0)
-            return openpyxl.load_workbook(decrypted, data_only=True)
+            return _xl_load_workbook(decrypted, data_only=True)
         except Exception as exc:
             raise ValueError(f"Could not open file with the provided password: {exc}") from exc
     else:
         try:
-            return openpyxl.load_workbook(path, data_only=True)
+            return _xl_load_workbook(path, data_only=True)
         except Exception as exc:
             # Some encrypted files raise an error even without a password prompt
             if "encrypted" in str(exc).lower() or "password" in str(exc).lower():
@@ -42,12 +42,17 @@ def load_workbook(path: str | Path, password: str | None = None) -> Workbook:
 
 
 def is_password_protected(path: str | Path) -> bool:
-    """Return True if the file appears to be password-protected."""
+    """Return True if the file appears to be password-protected.
+
+    Raises OSError if the file cannot be read (e.g. not found, permission denied).
+    """
     import msoffcrypto
     try:
         with Path(path).open("rb") as f:
             office_file = msoffcrypto.OfficeFile(f)
             return office_file.is_encrypted()
+    except OSError:
+        raise
     except Exception:
         return False
 
@@ -98,7 +103,7 @@ def _parse_dob(value: object) -> tuple[date | None, str]:
     if isinstance(value, date):
         return value, str(value)
     raw = str(value).strip()
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y", "%d %b %Y", "%d %B %Y"):
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d %b %Y", "%d %B %Y"):
         try:
             return datetime.strptime(raw, fmt).date(), raw
         except ValueError:
@@ -130,7 +135,9 @@ def export_results(
     ws_a = wb.create_sheet(title="Anomalies")
     ws_a.append(["Name", "Date of Birth", "Note"])
     for person in anomalies:
-        dob_str = person.dob.strftime("%d %b %Y") if person.dob else f"(unreadable: {person.raw_dob})"
+        dob_str = (
+            person.dob.strftime("%d %b %Y") if person.dob else f"(unreadable: {person.raw_dob})"
+        )
         note = "DOB outside expected range" if person.dob else "DOB missing or unreadable"
         ws_a.append([person.name, dob_str, note])
     for col in ws_a.columns:

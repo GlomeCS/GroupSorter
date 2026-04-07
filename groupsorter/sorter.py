@@ -126,8 +126,31 @@ def _proportional_allocate(counts: list[int], total_slots: int) -> list[int]:
     return floored
 
 
-def format_groups_report(groups: list[list[Person]], mode: str) -> str:
-    mode_label = "Mixed (age ranges distributed)" if mode == "mixed" else "Isolated (one age range per group)"
+def isolated_would_fall_back(
+    people: list[Person],
+    start_date: date,
+    end_date: date,
+    num_groups: int,
+) -> bool:
+    """Return True if isolated mode would fall back to mixed for the given inputs.
+
+    Isolated mode falls back when there are more non-empty sub-ranges than groups.
+    """
+    bands = sub_ranges(start_date, end_date)
+    non_empty_count = sum(
+        1 for band_start, band_end in bands
+        if any(band_start <= p.dob <= band_end for p in people if p.dob is not None)
+    )
+    return non_empty_count > num_groups
+
+
+def format_groups_report(groups: list[list[Person]], mode: str, fell_back: bool = False) -> str:
+    if mode == "mixed":
+        mode_label = "Mixed (age ranges distributed)"
+    elif fell_back:
+        mode_label = "Isolated → fell back to Mixed (more sub-ranges than groups)"
+    else:
+        mode_label = "Isolated (one age range per group)"
     lines = [f"Sort mode: {mode_label}", f"Groups: {len(groups)}", ""]
     for i, group in enumerate(groups, 1):
         lines.append(f"── Group {i} ({len(group)} {'person' if len(group) == 1 else 'people'}) ──")

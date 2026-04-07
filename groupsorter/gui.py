@@ -7,17 +7,19 @@ from datetime import date
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from .anomaly import find_anomalies, format_anomaly_report
+from openpyxl import Workbook
+
+from .anomaly import Person, find_anomalies, format_anomaly_report
 from .date_utils import AgeGroup, sub_ranges, suggested_age_groups
 from .excel_io import (
     column_headers,
     export_results,
     is_password_protected,
-    load_workbook,
+    open_workbook,
     read_people,
     sheet_names,
 )
-from .sorter import format_groups_report, sort_groups
+from .sorter import format_groups_report, isolated_would_fall_back, sort_groups
 
 
 class App(tk.Tk):
@@ -28,10 +30,10 @@ class App(tk.Tk):
         self.minsize(640, 560)
 
         # State
-        self._workbook = None
-        self._people: list = []
-        self._last_groups: list = []
-        self._last_anomalies: list = []
+        self._workbook: Workbook | None = None
+        self._people: list[Person] = []
+        self._last_groups: list[list[Person]] = []
+        self._last_anomalies: list[Person] = []
         self._last_start: date | None = None
         self._last_end: date | None = None
         self._custom_mode = False
@@ -65,18 +67,26 @@ class App(tk.Tk):
 
         ttk.Label(sc_frame, text="Sheet:").grid(row=0, column=0, sticky="w", padx=8, pady=4)
         self._sheet_var = tk.StringVar()
-        self._sheet_cb = ttk.Combobox(sc_frame, textvariable=self._sheet_var, state="disabled", width=28)
+        self._sheet_cb = ttk.Combobox(
+            sc_frame, textvariable=self._sheet_var, state="disabled", width=28
+        )
         self._sheet_cb.grid(row=0, column=1, sticky="w", padx=4, pady=4)
         self._sheet_cb.bind("<<ComboboxSelected>>", self._on_sheet_selected)
 
         ttk.Label(sc_frame, text="Name column:").grid(row=1, column=0, sticky="w", padx=8, pady=4)
         self._name_col_var = tk.StringVar()
-        self._name_col_cb = ttk.Combobox(sc_frame, textvariable=self._name_col_var, state="disabled", width=28)
+        self._name_col_cb = ttk.Combobox(
+            sc_frame, textvariable=self._name_col_var, state="disabled", width=28
+        )
         self._name_col_cb.grid(row=1, column=1, sticky="w", padx=4, pady=4)
 
-        ttk.Label(sc_frame, text="Date of Birth column:").grid(row=2, column=0, sticky="w", padx=8, pady=4)
+        ttk.Label(sc_frame, text="Date of Birth column:").grid(
+            row=2, column=0, sticky="w", padx=8, pady=4
+        )
         self._dob_col_var = tk.StringVar()
-        self._dob_col_cb = ttk.Combobox(sc_frame, textvariable=self._dob_col_var, state="disabled", width=28)
+        self._dob_col_cb = ttk.Combobox(
+            sc_frame, textvariable=self._dob_col_var, state="disabled", width=28
+        )
         self._dob_col_cb.grid(row=2, column=1, sticky="w", padx=4, pady=4)
 
         ttk.Button(sc_frame, text="Load People", command=self._load_people).grid(
@@ -101,13 +111,19 @@ class App(tk.Tk):
         self._custom_frame = ttk.Frame(ag_frame)
         ttk.Label(self._custom_frame, text="Start date (YYYY-MM-DD):").grid(row=0, column=0, padx=8)
         self._custom_start_var = tk.StringVar()
-        ttk.Entry(self._custom_frame, textvariable=self._custom_start_var, width=14).grid(row=0, column=1)
+        ttk.Entry(self._custom_frame, textvariable=self._custom_start_var, width=14).grid(
+            row=0, column=1
+        )
         ttk.Label(self._custom_frame, text="End date (YYYY-MM-DD):").grid(row=0, column=2, padx=8)
         self._custom_end_var = tk.StringVar()
-        ttk.Entry(self._custom_frame, textvariable=self._custom_end_var, width=14).grid(row=0, column=3)
+        ttk.Entry(self._custom_frame, textvariable=self._custom_end_var, width=14).grid(
+            row=0, column=3
+        )
 
         self._split_hint_var = tk.StringVar()
-        self._split_hint_lbl = ttk.Label(ag_frame, textvariable=self._split_hint_var, foreground="#555")
+        self._split_hint_lbl = ttk.Label(
+            ag_frame, textvariable=self._split_hint_var, foreground="#555"
+        )
         self._split_hint_lbl.grid(row=2, column=0, columnspan=4, sticky="w", padx=8, pady=2)
         self._update_split_hint()
 
@@ -115,7 +131,9 @@ class App(tk.Tk):
         sort_frame = ttk.LabelFrame(self, text="4. Sort Settings")
         sort_frame.pack(fill="x", **pad)
 
-        ttk.Label(sort_frame, text="Number of groups:").grid(row=0, column=0, sticky="w", padx=8, pady=4)
+        ttk.Label(sort_frame, text="Number of groups:").grid(
+            row=0, column=0, sticky="w", padx=8, pady=4
+        )
         self._num_groups_var = tk.IntVar(value=4)
         ttk.Spinbox(sort_frame, from_=1, to=100, textvariable=self._num_groups_var, width=6).grid(
             row=0, column=1, sticky="w", padx=4
@@ -174,7 +192,12 @@ class App(tk.Tk):
             return
 
         password = None
-        if is_password_protected(path):
+        try:
+            protected = is_password_protected(path)
+        except OSError as exc:
+            messagebox.showerror("Error opening file", str(exc))
+            return
+        if protected:
             password = simpledialog.askstring(
                 "Password required",
                 f"'{Path(path).name}' is password-protected.\nEnter the password:",
@@ -185,7 +208,7 @@ class App(tk.Tk):
                 return  # user cancelled
 
         try:
-            self._workbook = load_workbook(path, password=password)
+            self._workbook = open_workbook(path, password=password)
         except ValueError as exc:
             messagebox.showerror("Error opening file", str(exc))
             return
@@ -206,8 +229,14 @@ class App(tk.Tk):
         for cb in (self._name_col_cb, self._dob_col_cb):
             cb.configure(values=headers, state="readonly")
         # Auto-select likely columns
-        self._name_col_var.set(_guess_column(headers, ("name", "full name", "player", "child")) or (headers[0] if headers else ""))
-        self._dob_col_var.set(_guess_column(headers, ("dob", "date of birth", "birthday", "birth date")) or (headers[1] if len(headers) > 1 else ""))
+        self._name_col_var.set(
+            _guess_column(headers, ("name", "full name", "player", "child"))
+            or (headers[0] if headers else "")
+        )
+        self._dob_col_var.set(
+            _guess_column(headers, ("dob", "date of birth", "birthday", "birth date"))
+            or (headers[1] if len(headers) > 1 else "")
+        )
 
     def _load_people(self) -> None:
         if not self._workbook:
@@ -216,7 +245,9 @@ class App(tk.Tk):
         name_col = self._name_col_var.get()
         dob_col = self._dob_col_var.get()
         if not name_col or not dob_col:
-            messagebox.showwarning("Columns required", "Please select both a name column and a DOB column.")
+            messagebox.showwarning(
+                "Columns required", "Please select both a name column and a DOB column."
+            )
             return
         try:
             ws = self._workbook[self._sheet_var.get()]
@@ -243,7 +274,10 @@ class App(tk.Tk):
             if len(bands) == 1:
                 hint = f"Sub-range: {_fmt_date(bands[0][0])} – {_fmt_date(bands[0][1])}"
             else:
-                parts = [f"  Range {i+1}: {_fmt_date(s)} – {_fmt_date(e)}" for i, (s, e) in enumerate(bands)]
+                parts = [
+                    f"  Range {i+1}: {_fmt_date(s)} – {_fmt_date(e)}"
+                    for i, (s, e) in enumerate(bands)
+                ]
                 hint = f"Sub-ranges ({len(bands)}):\n" + "\n".join(parts)
         except Exception:
             hint = ""
@@ -301,18 +335,31 @@ class App(tk.Tk):
         anomaly_ids = {id(p) for p in anomalies}
         valid = [p for p in self._people if id(p) not in anomaly_ids]
 
+        fell_back = False
+        if mode == "isolated" and isolated_would_fall_back(valid, start, end, num_groups):
+            fell_back = True
+            messagebox.showwarning(
+                "Isolated mode fallback",
+                "There are more non-empty age sub-ranges than groups.\n"
+                "Isolated mode will fall back to mixed distribution.",
+            )
+
         self._last_groups = sort_groups(valid, start, end, num_groups, mode)
         self._last_anomalies = anomalies
-        self._display(format_groups_report(self._last_groups, mode))
+        self._display(format_groups_report(self._last_groups, mode, fell_back))
         if anomalies:
-            self._append(f"\n── {len(anomalies)} anomal{'y' if len(anomalies)==1 else 'ies'} excluded from sorting ──\n")
+            count = len(anomalies)
+            label = "anomaly" if count == 1 else "anomalies"
+            self._append(f"\n── {count} {label} excluded from sorting ──\n")
             for p in anomalies:
                 dob_str = p.dob.strftime("%d %b %Y") if p.dob else f"(unreadable: {p.raw_dob})"
                 self._append(f"  {p.name}  —  {dob_str}\n")
 
     def _export(self) -> None:
         if not self._last_groups and not self._last_anomalies:
-            messagebox.showwarning("Nothing to export", "Run 'Check Anomalies' or 'Sort Groups' first.")
+            messagebox.showwarning(
+                "Nothing to export", "Run 'Check Anomalies' or 'Sort Groups' first."
+            )
             return
         path = filedialog.asksaveasfilename(
             title="Save results as…",

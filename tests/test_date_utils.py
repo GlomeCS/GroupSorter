@@ -2,7 +2,6 @@
 
 from datetime import date
 
-
 from groupsorter.date_utils import current_school_year_start, sub_ranges, suggested_age_groups
 
 
@@ -63,3 +62,17 @@ class TestSubRanges:
         ranges = sub_ranges(date(2012, 7, 1), date(2013, 6, 30))
         assert len(ranges) == 1
         assert ranges[0] == (date(2012, 7, 1), date(2013, 6, 30))
+
+    def test_non_july1_start_mid_school_year(self):
+        # Start in March 2012 (mid school year 2011-12) — first sub-range should
+        # end on 30 Jun 2012, not span all the way to 30 Jun 2013.
+        ranges = sub_ranges(date(2012, 3, 1), date(2013, 6, 30))
+        assert len(ranges) == 2
+        assert ranges[0] == (date(2012, 3, 1), date(2012, 6, 30))
+        assert ranges[1] == (date(2012, 7, 1), date(2013, 6, 30))
+
+    def test_non_july1_start_after_july(self):
+        # Start in October 2012 (within school year 2012-13)
+        ranges = sub_ranges(date(2012, 10, 1), date(2013, 6, 30))
+        assert len(ranges) == 1
+        assert ranges[0] == (date(2012, 10, 1), date(2013, 6, 30))

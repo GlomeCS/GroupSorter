@@ -66,8 +66,11 @@ def sub_ranges(start_date: date, end_date: date) -> list[tuple[date, date]]:
     ranges: list[tuple[date, date]] = []
     current_start = start_date
     while current_start < end_date:
-        # Next July 1 after current_start (or same day if already July 1)
-        next_boundary = date(current_start.year + 1, 7, 1)
+        # Next July 1 boundary: if we haven't reached July yet this year, use this year's July 1
+        if current_start.month < 7:
+            next_boundary = date(current_start.year, 7, 1)
+        else:
+            next_boundary = date(current_start.year + 1, 7, 1)
         sub_end = date(next_boundary.year, 6, 30)
         if sub_end >= end_date:
             sub_end = end_date

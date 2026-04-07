@@ -2,9 +2,8 @@
 
 from datetime import date
 
-
 from groupsorter.anomaly import Person
-from groupsorter.sorter import _proportional_allocate, sort_groups
+from groupsorter.sorter import _proportional_allocate, isolated_would_fall_back, sort_groups
 
 
 def person(name: str, dob: date) -> Person:
@@ -88,6 +87,34 @@ class TestIsolatedMode:
         groups = sort_groups(people, START_3, END_3, 3, "isolated")
         assert sum(len(g) for g in groups) == 6
         assert len(groups) == 3
+
+    def test_groups_contain_single_sub_range(self):
+        # 4 groups, 2 sub-ranges → 2 groups per sub-range; each group must be pure
+        people = make_people_2yr(6, 6)
+        groups = sort_groups(people, START_2, END_2, 4, "isolated")
+        r1_start, r1_end = date(2011, 7, 1), date(2012, 6, 30)
+        r2_start, r2_end = date(2012, 7, 1), date(2013, 6, 30)
+        for group in groups:
+            if not group:
+                continue
+            in_r1 = all(r1_start <= p.dob <= r1_end for p in group)
+            in_r2 = all(r2_start <= p.dob <= r2_end for p in group)
+            assert in_r1 or in_r2, "Group mixes people from different sub-ranges"
+
+
+class TestIsolatedWouldFallBack:
+    def test_more_sub_ranges_than_groups(self):
+        people = make_people_2yr(3, 3)  # 2 non-empty sub-ranges
+        assert isolated_would_fall_back(people, START_2, END_2, 1) is True
+
+    def test_enough_groups(self):
+        people = make_people_2yr(3, 3)
+        assert isolated_would_fall_back(people, START_2, END_2, 2) is False
+
+    def test_empty_sub_range_not_counted(self):
+        # All people in the first sub-range only — 1 non-empty band < 2 groups
+        people = [person("A", date(2011, 9, 1)), person("B", date(2011, 10, 1))]
+        assert isolated_would_fall_back(people, START_2, END_2, 2) is False
 
 
 class TestProportionalAllocate:
