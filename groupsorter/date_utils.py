@@ -19,7 +19,7 @@ class AgeGroup:
 
 
 def _fmt(d: date) -> str:
-    return d.strftime("%-d %b %Y") if hasattr(date, "strftime") else str(d)
+    return f"{d.day} {d.strftime('%b %Y')}"
 
 
 # Fixed age bands: (label, ages_str, older_age, younger_age)

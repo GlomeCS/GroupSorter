@@ -1,4 +1,4 @@
-"""Group sorting: Mixed and Isolated modes, supporting 2 or 3 age sub-ranges."""
+"""Group sorting: Mixed and Isolated modes, supporting 1 or more age sub-ranges."""
 
 from datetime import date
 
@@ -75,14 +75,9 @@ def _sort_isolated(buckets: list[list[Person]], num_groups: int) -> list[list[Pe
     )
 
     groups: list[list[Person]] = []
-    for bucket, alloc in zip(buckets, allocations):
+    for bucket, alloc in zip(buckets, allocations, strict=True):
         if alloc == 0:
             continue
-        for j, person in enumerate(bucket):
-            slot = j % alloc
-            if len(groups) <= (len(groups) - alloc + slot):
-                groups.append([])
-            # Build sub-groups for this bucket
         sub_groups: list[list[Person]] = [[] for _ in range(alloc)]
         for j, person in enumerate(bucket):
             sub_groups[j % alloc].append(person)

@@ -267,7 +267,7 @@ class App(tk.Tk):
             return
         try:
             start, end = self._resolve_dates()
-        except Exception as exc:
+        except ValueError as exc:
             messagebox.showerror("Invalid date range", str(exc))
             return
         self._last_start = start
@@ -281,7 +281,7 @@ class App(tk.Tk):
             return
         try:
             start, end = self._resolve_dates()
-        except Exception as exc:
+        except ValueError as exc:
             messagebox.showerror("Invalid date range", str(exc))
             return
         try:
@@ -298,7 +298,8 @@ class App(tk.Tk):
 
         # Exclude anomalies before sorting
         anomalies = find_anomalies(self._people, start, end)
-        valid = [p for p in self._people if p not in anomalies]
+        anomaly_ids = {id(p) for p in anomalies}
+        valid = [p for p in self._people if id(p) not in anomaly_ids]
 
         self._last_groups = sort_groups(valid, start, end, num_groups, mode)
         self._last_anomalies = anomalies

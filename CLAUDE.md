@@ -4,11 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-The project uses the venv at `/Users/hbell/git/BCSSM/venv`. Always activate it before running Python commands:
-
-```bash
-source /Users/hbell/git/BCSSM/venv/bin/activate
-```
+Before running any Python commands, ask the user which virtual environment to use or whether to create one. All dependencies are declared in `pyproject.toml`.
 
 ```bash
 # Install (including dev tools)
@@ -36,7 +32,7 @@ pyinstaller --onefile --windowed --name GroupSorter groupsorter/main.py
 
 ## Architecture
 
-```
+```text
 groupsorter/
 ├── main.py       # Entry point — calls gui.App().mainloop()
 ├── gui.py        # Full tkinter GUI; orchestrates all other modules
