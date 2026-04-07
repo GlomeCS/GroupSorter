@@ -219,11 +219,13 @@ class App(tk.Tk):
         self._sheet_var.set(names[0])
         self._on_sheet_selected()
         self._people = []
+        self._invalidate()
         self._display("File loaded. Select a sheet and columns, then click 'Load People'.")
 
     def _on_sheet_selected(self, _event=None) -> None:
         if not self._workbook:
             return
+        self._invalidate()
         ws = self._workbook[self._sheet_var.get()]
         headers = column_headers(ws)
         for cb in (self._name_col_cb, self._dob_col_cb):
@@ -255,6 +257,7 @@ class App(tk.Tk):
         except ValueError as exc:
             messagebox.showerror("Error reading sheet", str(exc))
             return
+        self._invalidate()
         self._display(f"Loaded {len(self._people)} people from '{self._sheet_var.get()}'.")
 
     def _on_age_group_selected(self, _event=None) -> None:
@@ -265,6 +268,7 @@ class App(tk.Tk):
         else:
             self._custom_mode = False
             self._custom_frame.grid_forget()
+        self._invalidate()
         self._update_split_hint()
 
     def _update_split_hint(self) -> None:
@@ -288,6 +292,8 @@ class App(tk.Tk):
         if self._custom_mode:
             start = date.fromisoformat(self._custom_start_var.get().strip())
             end = date.fromisoformat(self._custom_end_var.get().strip())
+            if start > end:
+                raise ValueError("Custom start date must be on or before end date.")
             return start, end
         selection = self._age_group_var.get()
         for group in self._age_groups:
@@ -380,6 +386,13 @@ class App(tk.Tk):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    def _invalidate(self) -> None:
+        """Clear cached sort/anomaly results when inputs change."""
+        self._last_groups = []
+        self._last_anomalies = []
+        self._last_start = None
+        self._last_end = None
 
     def _display(self, text: str) -> None:
         self._results_text.configure(state="normal")

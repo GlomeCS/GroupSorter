@@ -26,6 +26,8 @@ def sort_groups(
         raise ValueError("num_groups must be at least 1")
 
     bands = sub_ranges(start_date, end_date)
+    if not bands:
+        bands = [(start_date, end_date)]
 
     # Partition valid people into sub-range buckets
     buckets: list[list[Person]] = [[] for _ in bands]
@@ -48,11 +50,13 @@ def sort_groups(
 
 
 def _sort_mixed(buckets: list[list[Person]], num_groups: int) -> list[list[Person]]:
-    """Distribute people round-robin per bucket so each group gets a mix of all sub-ranges."""
+    """Distribute people round-robin across all buckets so each group gets a mix of sub-ranges."""
     groups: list[list[Person]] = [[] for _ in range(num_groups)]
+    cursor = 0
     for bucket in buckets:
-        for i, person in enumerate(bucket):
-            groups[i % num_groups].append(person)
+        for person in bucket:
+            groups[cursor % num_groups].append(person)
+            cursor += 1
     return groups
 
 

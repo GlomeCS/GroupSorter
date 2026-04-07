@@ -2,9 +2,9 @@ name: Python application
 
 on:
   pull_request:
-    branches: [ "develop" ]
+    branches: [ "develop", "main" ]
   push:
-    branches: [ "feature/**" ]
+    branches: [ "develop", "main", "feature/**" ]
 
 permissions:
   contents: read
@@ -20,6 +20,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "pyproject.toml"
 
       - name: Install dependencies
         run: |
