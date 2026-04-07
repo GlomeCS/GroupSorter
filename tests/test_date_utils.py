@@ -2,7 +2,6 @@
 
 from datetime import date
 
-import pytest
 
 from groupsorter.date_utils import current_school_year_start, sub_ranges, suggested_age_groups
 

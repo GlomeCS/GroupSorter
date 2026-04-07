@@ -2,7 +2,6 @@
 
 from datetime import date
 
-import pytest
 
 from groupsorter.anomaly import Person
 from groupsorter.sorter import _proportional_allocate, sort_groups
