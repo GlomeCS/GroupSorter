@@ -71,7 +71,12 @@ def column_headers(ws: Worksheet) -> list[str]:
     return headers
 
 
-def read_people(ws: Worksheet, name_col: str, dob_col: str) -> list[Person]:
+def read_people(
+    ws: Worksheet,
+    name_col: str,
+    dob_col: str,
+    gender_col: str | None = None,
+) -> list[Person]:
     """Read people from a worksheet using the given column header names."""
     headers = [str(cell.value) if cell.value is not None else "" for cell in ws[1]]
     try:
@@ -79,6 +84,13 @@ def read_people(ws: Worksheet, name_col: str, dob_col: str) -> list[Person]:
         dob_idx = headers.index(dob_col)
     except ValueError as exc:
         raise ValueError(f"Column not found in sheet: {exc}") from exc
+
+    gender_idx: int | None = None
+    if gender_col is not None:
+        try:
+            gender_idx = headers.index(gender_col)
+        except ValueError as exc:
+            raise ValueError(f"Column not found in sheet: {exc}") from exc
 
     people: list[Person] = []
     for row in ws.iter_rows(min_row=2, values_only=True):
@@ -90,8 +102,28 @@ def read_people(ws: Worksheet, name_col: str, dob_col: str) -> list[Person]:
 
         name = str(name_val).strip() if name_val is not None else "(no name)"
         dob, raw = _parse_dob(dob_val)
-        people.append(Person(name=name, dob=dob, raw_dob=raw))
+
+        gender: str | None = None
+        raw_gender: str = ""
+        if gender_idx is not None:
+            gender_val = row[gender_idx] if gender_idx < len(row) else None
+            gender, raw_gender = _parse_gender(gender_val)
+
+        people.append(Person(name=name, dob=dob, raw_dob=raw, gender=gender, raw_gender=raw_gender))
     return people
+
+
+def _parse_gender(value: object) -> tuple[str | None, str]:
+    """Parse a gender cell. Returns (normalised, raw) where normalised is 'M', 'F', or None."""
+    if value is None:
+        return None, ""
+    raw = str(value).strip()
+    upper = raw.upper()
+    if upper in ("M", "MALE"):
+        return "M", raw
+    if upper in ("F", "FEMALE"):
+        return "F", raw
+    return None, raw
 
 
 def _parse_dob(value: object) -> tuple[date | None, str]:
@@ -115,19 +147,27 @@ def export_results(
     path: str | Path,
     groups: list[list[Person]],
     anomalies: list[Person],
+    gender_anomalies: list[Person] | None = None,
 ) -> None:
     """Write group sheets + an Anomalies sheet to a new Excel file."""
     wb = Workbook()
-    # Remove default empty sheet
     wb.remove(wb.active)
+
+    all_people = [p for group in groups for p in group]
+    include_gender = any(p.gender is not None for p in all_people) or gender_anomalies is not None
 
     for i, group in enumerate(groups, 1):
         ws = wb.create_sheet(title=f"Group {i}")
-        ws.append(["Name", "Date of Birth"])
+        headers: list[str] = ["Name", "Date of Birth"]
+        if include_gender:
+            headers.append("Gender")
+        ws.append(headers)
         for person in group:
             dob_str = person.dob.strftime("%d %b %Y") if person.dob else person.raw_dob
-            ws.append([person.name, dob_str])
-        # Auto-size columns
+            row: list[object] = [person.name, dob_str]
+            if include_gender:
+                row.append(person.gender or "")
+            ws.append(row)
         for col in ws.columns:
             max_len = max((len(str(cell.value or "")) for cell in col), default=0)
             ws.column_dimensions[col[0].column_letter].width = max_len + 4
@@ -140,6 +180,19 @@ def export_results(
         )
         note = "DOB outside expected range" if person.dob else "DOB missing or unreadable"
         ws_a.append([person.name, dob_str, note])
+    if gender_anomalies:
+        ws_a.append([])
+        ws_a.append(["── Gender Anomalies ──", "", ""])
+        for person in gender_anomalies:
+            dob_str = (
+                person.dob.strftime("%d %b %Y") if person.dob else f"(unreadable: {person.raw_dob})"
+            )
+            note = (
+                f"Gender unrecognised: {person.raw_gender!r}"
+                if person.raw_gender
+                else "Gender missing"
+            )
+            ws_a.append([person.name, dob_str, note])
     for col in ws_a.columns:
         max_len = max((len(str(cell.value or "")) for cell in col), default=0)
         ws_a.column_dimensions[col[0].column_letter].width = max_len + 4

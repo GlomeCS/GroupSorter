@@ -7,8 +7,10 @@ from datetime import date
 @dataclass
 class Person:
     name: str
-    dob: date | None   # None if the DOB cell was blank or unparseable
-    raw_dob: str = ""  # original cell value, for display when dob is None
+    dob: date | None      # None if the DOB cell was blank or unparseable
+    raw_dob: str = ""     # original cell value, for display when dob is None
+    gender: str | None = None  # "M", "F", or None (not loaded / blank / invalid)
+    raw_gender: str = ""  # original cell value, for display when gender is None
 
 
 def find_anomalies(
@@ -24,16 +26,37 @@ def find_anomalies(
     return anomalies
 
 
+def find_gender_anomalies(people: list[Person]) -> list[Person]:
+    """Return people whose gender is None (blank or not M/F in the source data)."""
+    return [p for p in people if p.gender is None]
+
+
 def format_anomaly_report(anomalies: list[Person], start_date: date, end_date: date) -> str:
     if not anomalies:
-        return "No anomalies found — all DOBs are within the expected range."
+        return "No DOB anomalies found — all DOBs are within the expected range."
 
     lines = [
         f"Expected range: {start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')}",
-        f"Anomalies found: {len(anomalies)}",
+        f"DOB anomalies found: {len(anomalies)}",
         "",
     ]
     for p in anomalies:
         dob_str = p.dob.strftime("%d %b %Y") if p.dob else f"(unreadable: {p.raw_dob!r})"
         lines.append(f"  {p.name}  —  DOB: {dob_str}")
+    return "\n".join(lines)
+
+
+def format_gender_anomaly_report(anomalies: list[Person]) -> str:
+    if not anomalies:
+        return "No gender anomalies found — all gender values are present and valid."
+
+    lines = [
+        f"Gender anomalies found: {len(anomalies)}",
+        "(missing or not M/F — excluded from sorting)",
+        "",
+    ]
+    for p in anomalies:
+        dob_str = p.dob.strftime("%d %b %Y") if p.dob else "(unknown DOB)"
+        gender_str = f"(unrecognised: {p.raw_gender!r})" if p.raw_gender else "(missing)"
+        lines.append(f"  {p.name}  —  DOB: {dob_str}  —  Gender: {gender_str}")
     return "\n".join(lines)

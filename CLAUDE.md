@@ -7,8 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Before running any Python commands, ask the user which virtual environment to use or whether to create one. All dependencies are declared in `pyproject.toml`.
 
 ```bash
-# Install (including dev tools)
-pip install -e ".[dev]"
+# Install runtime dependencies
+pip install -r requirements.txt
+
+# Install dev tools (pytest, ruff, pyinstaller)
+pip install -r requirements-dev.txt
 
 # Run the GUI app
 python -m groupsorter
