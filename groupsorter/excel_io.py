@@ -8,7 +8,7 @@ from openpyxl import Workbook
 from openpyxl import load_workbook as _xl_load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
-from .anomaly import Person
+from .domain import Person
 
 
 def open_workbook(path: str | Path, password: str | None = None) -> Workbook:

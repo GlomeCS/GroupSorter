@@ -2,7 +2,8 @@
 
 from datetime import date
 
-from groupsorter.anomaly import Person, find_anomalies
+from groupsorter.anomaly import find_anomalies
+from groupsorter.domain import Person
 
 
 def make_person(name: str, dob: date | None) -> Person:
