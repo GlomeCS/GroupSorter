@@ -64,6 +64,9 @@ def sort_groups(
         male_groups_count, female_groups_count = allocs[0], allocs[1]
 
         groups: list[list[Person]] = []
+        if mode not in ("mixed", "isolated"):
+            raise ValueError(f"Unknown mode: {mode!r}. Expected 'mixed' or 'isolated'.")
+
         if male_groups_count > 0:
             male_buckets = make_buckets(male)
             if mode == "mixed":
@@ -98,8 +101,11 @@ def _interleave_genders(bucket: list[Person]) -> list[Person]:
     """Alternate M and F within a bucket so gender is spread evenly across groups."""
     males = [p for p in bucket if p.gender == "M"]
     females = [p for p in bucket if p.gender == "F"]
-    # Caller must pre-filter gender anomalies; nothing else should reach here.
-    assert len(males) + len(females) == len(bucket), "unexpected non-M/F person in bucket"
+    if len(males) + len(females) != len(bucket):
+        raise ValueError(
+            f"_interleave_genders received {len(bucket) - len(males) - len(females)} "
+            "person(s) with gender not 'M' or 'F'. Filter gender anomalies before calling."
+        )
     result: list[Person] = []
     for i in range(max(len(males), len(females))):
         if i < len(males):
@@ -173,11 +179,14 @@ def _proportional_allocate(counts: list[int], total_slots: int) -> list[int]:
             floored[i] += 1
     elif remainder < 0:
         for _ in range(-remainder):
-            idx = max(
-                (i for i in range(len(floored)) if floored[i] > 1),
-                key=lambda i: floored[i],
-                default=0,
-            )
+            over_alloc = [i for i in range(len(floored)) if floored[i] > 1]
+            if over_alloc:
+                idx = max(over_alloc, key=lambda i: floored[i])
+            else:
+                # Every non-empty bucket was bumped to 1 but slots are exhausted;
+                # take back from the bucket with the smallest proportional share.
+                bumped = [i for i in range(len(floored)) if floored[i] > 0]
+                idx = min(bumped, key=lambda i: raw[i])
             floored[idx] -= 1
 
     return floored

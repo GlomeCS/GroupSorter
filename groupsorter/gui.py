@@ -377,7 +377,9 @@ class App(tk.Tk):
         report = format_anomaly_report(self._last_anomalies, start, end)
 
         if self._gender_col_var.get() != _GENDER_NONE:
-            self._last_gender_anomalies = find_gender_anomalies(self._people)
+            dob_anomaly_ids = {id(p) for p in self._last_anomalies}
+            dob_valid = [p for p in self._people if id(p) not in dob_anomaly_ids]
+            self._last_gender_anomalies = find_gender_anomalies(dob_valid)
             report += "\n\n" + format_gender_anomaly_report(self._last_gender_anomalies)
         else:
             self._last_gender_anomalies = []
