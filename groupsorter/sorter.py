@@ -201,10 +201,24 @@ def isolated_would_fall_back(
     return non_empty_count > num_groups
 
 
-def gender_allocation(people: list[Person], num_groups: int) -> tuple[int, int]:
-    """Return (male_groups, female_groups) for isolated gender mode."""
-    male_count = sum(1 for p in people if p.gender == "M")
-    female_count = sum(1 for p in people if p.gender == "F")
+def gender_allocation(
+    people: list[Person],
+    num_groups: int,
+    start_date: date,
+    end_date: date,
+) -> tuple[int, int]:
+    """Return (male_groups, female_groups) for isolated gender mode.
+
+    Mirrors sort_groups: only people with a valid DOB within the date range are counted.
+    """
+    male_count = sum(
+        1 for p in people
+        if p.gender == "M" and p.dob is not None and start_date <= p.dob <= end_date
+    )
+    female_count = sum(
+        1 for p in people
+        if p.gender == "F" and p.dob is not None and start_date <= p.dob <= end_date
+    )
     allocs = _proportional_allocate([male_count, female_count], num_groups)
     return allocs[0], allocs[1]
 
