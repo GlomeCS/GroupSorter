@@ -1,5 +1,7 @@
 """Tests for gender-aware sorting and anomaly detection."""
 
+from __future__ import annotations
+
 from datetime import date
 
 from groupsorter.anomaly import Person, find_gender_anomalies, format_gender_anomaly_report

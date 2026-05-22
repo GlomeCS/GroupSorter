@@ -1,5 +1,7 @@
 """Excel file loading (including password-protected files) and export."""
 
+from __future__ import annotations
+
 import io
 from datetime import date, datetime
 from pathlib import Path

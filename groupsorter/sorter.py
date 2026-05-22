@@ -1,5 +1,7 @@
 """Group sorting: Mixed and Isolated modes, supporting 1 or more age sub-ranges."""
 
+from __future__ import annotations
+
 from datetime import date
 
 from .anomaly import Person
