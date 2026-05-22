@@ -80,10 +80,15 @@ GroupSorter runs on any platform with Python 3.11+ and Tkinter (included in stan
 git clone https://github.com/your-org/GroupSorter.git
 cd GroupSorter
 
-# Install into a virtual environment
+# Create and activate a virtual environment
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
-pip install -e ".[dev]"
+
+# Install runtime dependencies
+pip install -r requirements.txt
+
+# Or, for development (includes pytest, ruff, pyinstaller)
+pip install -r requirements-dev.txt
 ```
 
 ---
