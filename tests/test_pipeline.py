@@ -32,7 +32,11 @@ class TestRunSortReturnsResult:
     def test_total_people_preserved(self):
         people = make_people(5, 5)
         result = run_sort(people, START, END, 2, "mixed", None)
-        total = sum(len(g) for g in result.groups) + len(result.dob_anomalies) + len(result.gender_anomalies)
+        total = (
+            sum(len(g) for g in result.groups)
+            + len(result.dob_anomalies)
+            + len(result.gender_anomalies)
+        )
         assert total == 10
 
 

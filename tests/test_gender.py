@@ -1,11 +1,13 @@
 """Tests for gender-aware sorting and anomaly detection."""
 
+from __future__ import annotations
+
 from datetime import date
 
 from groupsorter.anomaly import find_gender_anomalies
 from groupsorter.domain import Person
-from groupsorter.reporting import format_gender_anomaly_report
 from groupsorter.excel_io import _parse_gender
+from groupsorter.reporting import format_gender_anomaly_report
 from groupsorter.sorter import sort_groups
 
 START = date(2011, 7, 1)
