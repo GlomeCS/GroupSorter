@@ -9,7 +9,13 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from openpyxl import Workbook
 
-from .anomaly import Person, find_anomalies, format_anomaly_report
+from .anomaly import (
+    Person,
+    find_anomalies,
+    find_gender_anomalies,
+    format_anomaly_report,
+    format_gender_anomaly_report,
+)
 from .date_utils import AgeGroup, sub_ranges, suggested_age_groups
 from .excel_io import (
     column_headers,
@@ -19,7 +25,14 @@ from .excel_io import (
     read_people,
     sheet_names,
 )
-from .sorter import format_groups_report, isolated_would_fall_back, sort_groups
+from .sorter import (
+    format_groups_report,
+    gender_allocation,
+    isolated_would_fall_back,
+    sort_groups,
+)
+
+_GENDER_NONE = "(none — no gender sorting)"
 
 
 class App(tk.Tk):
@@ -34,6 +47,7 @@ class App(tk.Tk):
         self._people: list[Person] = []
         self._last_groups: list[list[Person]] = []
         self._last_anomalies: list[Person] = []
+        self._last_gender_anomalies: list[Person] = []
         self._last_start: date | None = None
         self._last_end: date | None = None
         self._custom_mode = False
@@ -89,8 +103,18 @@ class App(tk.Tk):
         )
         self._dob_col_cb.grid(row=2, column=1, sticky="w", padx=4, pady=4)
 
+        ttk.Label(sc_frame, text="Gender column (optional):").grid(
+            row=3, column=0, sticky="w", padx=8, pady=4
+        )
+        self._gender_col_var = tk.StringVar(value=_GENDER_NONE)
+        self._gender_col_cb = ttk.Combobox(
+            sc_frame, textvariable=self._gender_col_var, state="disabled", width=28
+        )
+        self._gender_col_cb.grid(row=3, column=1, sticky="w", padx=4, pady=4)
+        self._gender_col_cb.bind("<<ComboboxSelected>>", self._on_gender_col_changed)
+
         ttk.Button(sc_frame, text="Load People", command=self._load_people).grid(
-            row=3, column=0, columnspan=2, pady=6
+            row=4, column=0, columnspan=2, pady=6
         )
 
         # ── Age group ────────────────────────────────────────────────
@@ -139,7 +163,7 @@ class App(tk.Tk):
             row=0, column=1, sticky="w", padx=4
         )
 
-        ttk.Label(sort_frame, text="Mode:").grid(row=1, column=0, sticky="w", padx=8, pady=4)
+        ttk.Label(sort_frame, text="Age mode:").grid(row=1, column=0, sticky="w", padx=8, pady=4)
         self._mode_var = tk.StringVar(value="mixed")
         ttk.Radiobutton(
             sort_frame, text="Mixed (each group gets a spread of all age sub-ranges)",
@@ -149,6 +173,25 @@ class App(tk.Tk):
             sort_frame, text="Isolated (each group contains only one age sub-range)",
             variable=self._mode_var, value="isolated"
         ).grid(row=2, column=1, sticky="w", padx=4)
+
+        # Gender mode (hidden until a gender column is selected)
+        self._gender_sort_frame = ttk.Frame(sort_frame)
+        ttk.Label(self._gender_sort_frame, text="Gender mode:").grid(
+            row=0, column=0, sticky="w", padx=8, pady=4
+        )
+        self._gender_mode_var = tk.StringVar(value="mixed")
+        ttk.Radiobutton(
+            self._gender_sort_frame,
+            text="Mixed (gender spread evenly across groups)",
+            variable=self._gender_mode_var,
+            value="mixed",
+        ).grid(row=0, column=1, sticky="w", padx=4)
+        ttk.Radiobutton(
+            self._gender_sort_frame,
+            text="Isolated (one gender per group)",
+            variable=self._gender_mode_var,
+            value="isolated",
+        ).grid(row=1, column=1, sticky="w", padx=4)
 
         # ── Action buttons ───────────────────────────────────────────
         btn_frame = ttk.Frame(self)
@@ -230,7 +273,6 @@ class App(tk.Tk):
         headers = column_headers(ws)
         for cb in (self._name_col_cb, self._dob_col_cb):
             cb.configure(values=headers, state="readonly")
-        # Auto-select likely columns
         self._name_col_var.set(
             _guess_column(headers, ("name", "full name", "player", "child"))
             or (headers[0] if headers else "")
@@ -239,6 +281,20 @@ class App(tk.Tk):
             _guess_column(headers, ("dob", "date of birth", "birthday", "birth date"))
             or (headers[1] if len(headers) > 1 else "")
         )
+        gender_options = [_GENDER_NONE] + headers
+        self._gender_col_cb.configure(values=gender_options, state="readonly")
+        detected = _guess_column(headers, ("gender", "sex", "m/f", "male/female"))
+        self._gender_col_var.set(detected if detected else _GENDER_NONE)
+        self._on_gender_col_changed()
+
+    def _on_gender_col_changed(self, _event=None) -> None:
+        if self._gender_col_var.get() == _GENDER_NONE:
+            self._gender_sort_frame.grid_forget()
+        else:
+            self._gender_sort_frame.grid(
+                row=3, column=0, columnspan=2, sticky="w", padx=4, pady=2
+            )
+        self._invalidate()
 
     def _load_people(self) -> None:
         if not self._workbook:
@@ -251,14 +307,19 @@ class App(tk.Tk):
                 "Columns required", "Please select both a name column and a DOB column."
             )
             return
+        gender_col_raw = self._gender_col_var.get()
+        gender_col = None if gender_col_raw == _GENDER_NONE else gender_col_raw
         try:
             ws = self._workbook[self._sheet_var.get()]
-            self._people = read_people(ws, name_col, dob_col)
+            self._people = read_people(ws, name_col, dob_col, gender_col=gender_col)
         except ValueError as exc:
             messagebox.showerror("Error reading sheet", str(exc))
             return
         self._invalidate()
-        self._display(f"Loaded {len(self._people)} people from '{self._sheet_var.get()}'.")
+        gender_note = f" (with gender from '{gender_col}')" if gender_col else ""
+        self._display(
+            f"Loaded {len(self._people)} people from '{self._sheet_var.get()}'{gender_note}."
+        )
 
     def _on_age_group_selected(self, _event=None) -> None:
         selection = self._age_group_var.get()
@@ -313,7 +374,15 @@ class App(tk.Tk):
         self._last_start = start
         self._last_end = end
         self._last_anomalies = find_anomalies(self._people, start, end)
-        self._display(format_anomaly_report(self._last_anomalies, start, end))
+        report = format_anomaly_report(self._last_anomalies, start, end)
+
+        if self._gender_col_var.get() != _GENDER_NONE:
+            self._last_gender_anomalies = find_gender_anomalies(self._people)
+            report += "\n\n" + format_gender_anomaly_report(self._last_gender_anomalies)
+        else:
+            self._last_gender_anomalies = []
+
+        self._display(report)
 
     def _sort_groups(self) -> None:
         if not self._people:
@@ -336,33 +405,79 @@ class App(tk.Tk):
         self._last_end = end
         mode = self._mode_var.get()
 
-        # Exclude anomalies before sorting
+        # Exclude DOB anomalies
         anomalies = find_anomalies(self._people, start, end)
         anomaly_ids = {id(p) for p in anomalies}
         valid = [p for p in self._people if id(p) not in anomaly_ids]
 
-        fell_back = False
-        if mode == "isolated" and isolated_would_fall_back(valid, start, end, num_groups):
-            fell_back = True
-            messagebox.showwarning(
-                "Isolated mode fallback",
-                "There are more non-empty age sub-ranges than groups.\n"
-                "Isolated mode will fall back to mixed distribution.",
-            )
+        # Exclude gender anomalies if a gender column is active
+        gender_mode: str | None = None
+        gender_anomalies: list[Person] = []
+        if self._gender_col_var.get() != _GENDER_NONE:
+            gender_anomalies = find_gender_anomalies(valid)
+            gender_anomaly_ids = {id(p) for p in gender_anomalies}
+            valid = [p for p in valid if id(p) not in gender_anomaly_ids]
+            gender_mode = self._gender_mode_var.get()
 
-        self._last_groups = sort_groups(valid, start, end, num_groups, mode)
         self._last_anomalies = anomalies
-        self._display(format_groups_report(self._last_groups, mode, fell_back))
+        self._last_gender_anomalies = gender_anomalies
+
+        # Warn about isolated-mode fallbacks
+        fell_back = False
+        if mode == "isolated":
+            if gender_mode == "isolated":
+                male_g, female_g = gender_allocation(valid, num_groups)
+                male_valid = [p for p in valid if p.gender == "M"]
+                female_valid = [p for p in valid if p.gender == "F"]
+                if (male_g > 0 and isolated_would_fall_back(male_valid, start, end, male_g)) or \
+                   (female_g > 0 and isolated_would_fall_back(female_valid, start, end, female_g)):
+                    fell_back = True
+                    messagebox.showwarning(
+                        "Isolated mode fallback",
+                        "Within one or both gender groups, there are more age sub-ranges than\n"
+                        "allocated groups. Isolated age mode will fall back to mixed for those.",
+                    )
+            else:
+                if isolated_would_fall_back(valid, start, end, num_groups):
+                    fell_back = True
+                    messagebox.showwarning(
+                        "Isolated mode fallback",
+                        "There are more non-empty age sub-ranges than groups.\n"
+                        "Isolated mode will fall back to mixed distribution.",
+                    )
+
+        # Warn if one gender gets zero groups in isolated gender mode
+        if gender_mode == "isolated":
+            male_g, female_g = gender_allocation(valid, num_groups)
+            if male_g == 0 or female_g == 0:
+                absent = "male" if male_g == 0 else "female"
+                messagebox.showwarning(
+                    "Gender allocation warning",
+                    f"There are not enough {absent} participants for a dedicated group.\n"
+                    f"All groups will be allocated to the other gender.",
+                )
+
+        self._last_groups = sort_groups(valid, start, end, num_groups, mode, gender_mode)
+        self._display(format_groups_report(self._last_groups, mode, fell_back, gender_mode))
+
         if anomalies:
             count = len(anomalies)
             label = "anomaly" if count == 1 else "anomalies"
-            self._append(f"\n── {count} {label} excluded from sorting ──\n")
+            self._append(f"\n── {count} DOB {label} excluded ──\n")
             for p in anomalies:
                 dob_str = p.dob.strftime("%d %b %Y") if p.dob else f"(unreadable: {p.raw_dob})"
                 self._append(f"  {p.name}  —  {dob_str}\n")
 
+        if gender_anomalies:
+            count = len(gender_anomalies)
+            label = "anomaly" if count == 1 else "anomalies"
+            self._append(f"\n── {count} gender {label} excluded ──\n")
+            for p in gender_anomalies:
+                dob_str = p.dob.strftime("%d %b %Y") if p.dob else "(unknown DOB)"
+                self._append(f"  {p.name}  —  Gender: (missing)\n")
+
     def _export(self) -> None:
-        if not self._last_groups and not self._last_anomalies:
+        if not self._last_groups and not self._last_anomalies and not self._last_gender_anomalies:
             messagebox.showwarning(
                 "Nothing to export", "Run 'Check Anomalies' or 'Sort Groups' first."
             )
@@ -375,7 +490,12 @@ class App(tk.Tk):
         if not path:
             return
         try:
-            export_results(path, self._last_groups, self._last_anomalies)
+            export_results(
+                path,
+                self._last_groups,
+                self._last_anomalies,
+                gender_anomalies=self._last_gender_anomalies or None,
+            )
             messagebox.showinfo("Exported", f"Results saved to:\n{path}")
         except Exception as exc:
             messagebox.showerror("Export failed", str(exc))
@@ -391,6 +511,7 @@ class App(tk.Tk):
         """Clear cached sort/anomaly results when inputs change."""
         self._last_groups = []
         self._last_anomalies = []
+        self._last_gender_anomalies = []
         self._last_start = None
         self._last_end = None
 
