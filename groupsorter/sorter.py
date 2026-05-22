@@ -32,6 +32,8 @@ def sort_groups(
     """
     if num_groups < 1:
         raise ValueError("num_groups must be at least 1")
+    if mode not in ("mixed", "isolated"):
+        raise ValueError(f"Unknown mode: {mode!r}. Expected 'mixed' or 'isolated'.")
 
     bands = sub_ranges(start_date, end_date)
     if not bands:
@@ -50,6 +52,19 @@ def sort_groups(
                     break
         return buckets
 
+    if gender_mode in ("mixed", "isolated"):
+        invalid_gender = [
+            p for p in people
+            if p.dob is not None
+            and start_date <= p.dob <= end_date
+            and p.gender not in ("M", "F")
+        ]
+        if invalid_gender:
+            raise ValueError(
+                f"sort_groups received {len(invalid_gender)} person(s) with gender not "
+                "'M' or 'F'. Exclude gender anomalies before calling."
+            )
+
     if gender_mode == "isolated":
         male = [p for p in people if p.gender == "M"]
         female = [p for p in people if p.gender == "F"]
@@ -64,8 +79,6 @@ def sort_groups(
         male_groups_count, female_groups_count = allocs[0], allocs[1]
 
         groups: list[list[Person]] = []
-        if mode not in ("mixed", "isolated"):
-            raise ValueError(f"Unknown mode: {mode!r}. Expected 'mixed' or 'isolated'.")
 
         if male_groups_count > 0:
             male_buckets = make_buckets(male)
@@ -91,10 +104,8 @@ def sort_groups(
 
         if mode == "mixed":
             return _sort_mixed(buckets, num_groups)
-        elif mode == "isolated":
-            return _sort_isolated(buckets, num_groups)
         else:
-            raise ValueError(f"Unknown mode: {mode!r}. Expected 'mixed' or 'isolated'.")
+            return _sort_isolated(buckets, num_groups)
 
 
 def _interleave_genders(bucket: list[Person]) -> list[Person]:

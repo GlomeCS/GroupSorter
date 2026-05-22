@@ -159,6 +159,7 @@ class App(tk.Tk):
             row=0, column=0, sticky="w", padx=8, pady=4
         )
         self._num_groups_var = tk.IntVar(value=4)
+        self._num_groups_var.trace_add("write", lambda *_: self._invalidate())
         ttk.Spinbox(sort_frame, from_=1, to=100, textvariable=self._num_groups_var, width=6).grid(
             row=0, column=1, sticky="w", padx=4
         )
@@ -167,11 +168,11 @@ class App(tk.Tk):
         self._mode_var = tk.StringVar(value="mixed")
         ttk.Radiobutton(
             sort_frame, text="Mixed (each group gets a spread of all age sub-ranges)",
-            variable=self._mode_var, value="mixed"
+            variable=self._mode_var, value="mixed", command=self._invalidate,
         ).grid(row=1, column=1, sticky="w", padx=4)
         ttk.Radiobutton(
             sort_frame, text="Isolated (each group contains only one age sub-range)",
-            variable=self._mode_var, value="isolated"
+            variable=self._mode_var, value="isolated", command=self._invalidate,
         ).grid(row=2, column=1, sticky="w", padx=4)
 
         # Gender mode (hidden until a gender column is selected)
@@ -185,12 +186,14 @@ class App(tk.Tk):
             text="Mixed (gender spread evenly across groups)",
             variable=self._gender_mode_var,
             value="mixed",
+            command=self._invalidate,
         ).grid(row=0, column=1, sticky="w", padx=4)
         ttk.Radiobutton(
             self._gender_sort_frame,
             text="Isolated (one gender per group)",
             variable=self._gender_mode_var,
             value="isolated",
+            command=self._invalidate,
         ).grid(row=1, column=1, sticky="w", padx=4)
 
         # ── Action buttons ───────────────────────────────────────────
@@ -451,9 +454,14 @@ class App(tk.Tk):
                         "Isolated mode will fall back to mixed distribution.",
                     )
 
-        # Warn if one gender gets zero groups in isolated gender mode
+        # Warn if one or both genders get zero groups in isolated gender mode
         if gender_mode == "isolated":
-            if male_g == 0 or female_g == 0:
+            if male_g == 0 and female_g == 0:
+                messagebox.showwarning(
+                    "Gender allocation warning",
+                    "No participants remain after filtering. No groups will contain any people.",
+                )
+            elif male_g == 0 or female_g == 0:
                 absent = "male" if male_g == 0 else "female"
                 messagebox.showwarning(
                     "Gender allocation warning",
@@ -499,7 +507,11 @@ class App(tk.Tk):
                 path,
                 self._last_groups,
                 self._last_anomalies,
-                gender_anomalies=self._last_gender_anomalies or None,
+                gender_anomalies=(
+                    self._last_gender_anomalies
+                    if self._gender_col_var.get() != _GENDER_NONE
+                    else None
+                ),
             )
             messagebox.showinfo("Exported", f"Results saved to:\n{path}")
         except Exception as exc:

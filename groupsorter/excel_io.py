@@ -154,7 +154,7 @@ def export_results(
     wb.remove(wb.active)
 
     all_people = [p for group in groups for p in group]
-    include_gender = any(p.gender is not None for p in all_people)
+    include_gender = any(p.gender is not None for p in all_people) or gender_anomalies is not None
 
     for i, group in enumerate(groups, 1):
         ws = wb.create_sheet(title=f"Group {i}")
