@@ -1,5 +1,7 @@
 """Anomaly detection: identify people whose DOB falls outside the expected range."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import date
 
