@@ -98,14 +98,14 @@ def _interleave_genders(bucket: list[Person]) -> list[Person]:
     """Alternate M and F within a bucket so gender is spread evenly across groups."""
     males = [p for p in bucket if p.gender == "M"]
     females = [p for p in bucket if p.gender == "F"]
-    other = [p for p in bucket if p.gender not in ("M", "F")]
+    # Caller must pre-filter gender anomalies; nothing else should reach here.
+    assert len(males) + len(females) == len(bucket), "unexpected non-M/F person in bucket"
     result: list[Person] = []
     for i in range(max(len(males), len(females))):
         if i < len(males):
             result.append(males[i])
         if i < len(females):
             result.append(females[i])
-    result.extend(other)
     return result
 
 

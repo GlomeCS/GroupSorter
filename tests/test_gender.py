@@ -29,31 +29,39 @@ def make_people(n_male: int, n_female: int) -> list[Person]:
 
 class TestParseGender:
     def test_m(self):
-        assert _parse_gender("M") == "M"
+        assert _parse_gender("M") == ("M", "M")
 
     def test_f(self):
-        assert _parse_gender("F") == "F"
+        assert _parse_gender("F") == ("F", "F")
 
     def test_male_word(self):
-        assert _parse_gender("male") == "M"
+        assert _parse_gender("male") == ("M", "male")
 
     def test_female_word(self):
-        assert _parse_gender("FEMALE") == "F"
+        assert _parse_gender("FEMALE") == ("F", "FEMALE")
 
     def test_lowercase(self):
-        assert _parse_gender("m") == "M"
-        assert _parse_gender("f") == "F"
+        assert _parse_gender("m") == ("M", "m")
+        assert _parse_gender("f") == ("F", "f")
 
     def test_none_returns_none(self):
-        assert _parse_gender(None) is None
+        normalised, raw = _parse_gender(None)
+        assert normalised is None
+        assert raw == ""
 
     def test_blank_returns_none(self):
-        assert _parse_gender("") is None
-        assert _parse_gender("  ") is None
+        assert _parse_gender("")[0] is None
+        assert _parse_gender("  ")[0] is None
 
-    def test_unknown_returns_none(self):
-        assert _parse_gender("X") is None
-        assert _parse_gender("other") is None
+    def test_unknown_returns_none_with_raw(self):
+        normalised, raw = _parse_gender("X")
+        assert normalised is None
+        assert raw == "X"
+
+    def test_unrecognised_preserves_raw(self):
+        normalised, raw = _parse_gender("NONBINARY")
+        assert normalised is None
+        assert raw == "NONBINARY"
 
 
 # ---------------------------------------------------------------------------
@@ -96,6 +104,17 @@ class TestFormatGenderAnomalyReport:
         report = format_gender_anomaly_report([p])
         assert "Unknown" in report
         assert "1" in report
+
+    def test_blank_gender_shows_missing(self):
+        p = Person(name="Blank", dob=date(2012, 5, 1), gender=None, raw_gender="")
+        report = format_gender_anomaly_report([p])
+        assert "(missing)" in report
+
+    def test_unrecognised_gender_shows_raw_value(self):
+        p = Person(name="Mx", dob=date(2012, 5, 1), gender=None, raw_gender="NONBINARY")
+        report = format_gender_anomaly_report([p])
+        assert "NONBINARY" in report
+        assert "unrecognised" in report
 
 
 # ---------------------------------------------------------------------------

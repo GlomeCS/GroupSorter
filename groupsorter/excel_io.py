@@ -104,24 +104,26 @@ def read_people(
         dob, raw = _parse_dob(dob_val)
 
         gender: str | None = None
+        raw_gender: str = ""
         if gender_idx is not None:
             gender_val = row[gender_idx] if gender_idx < len(row) else None
-            gender = _parse_gender(gender_val)
+            gender, raw_gender = _parse_gender(gender_val)
 
-        people.append(Person(name=name, dob=dob, raw_dob=raw, gender=gender))
+        people.append(Person(name=name, dob=dob, raw_dob=raw, gender=gender, raw_gender=raw_gender))
     return people
 
 
-def _parse_gender(value: object) -> str | None:
-    """Parse a gender cell. Returns 'M', 'F', or None for blank/unrecognised values."""
+def _parse_gender(value: object) -> tuple[str | None, str]:
+    """Parse a gender cell. Returns (normalised, raw) where normalised is 'M', 'F', or None."""
     if value is None:
-        return None
-    raw = str(value).strip().upper()
-    if raw in ("M", "MALE"):
-        return "M"
-    if raw in ("F", "FEMALE"):
-        return "F"
-    return None
+        return None, ""
+    raw = str(value).strip()
+    upper = raw.upper()
+    if upper in ("M", "MALE"):
+        return "M", raw
+    if upper in ("F", "FEMALE"):
+        return "F", raw
+    return None, raw
 
 
 def _parse_dob(value: object) -> tuple[date | None, str]:
@@ -178,11 +180,15 @@ def export_results(
         )
         note = "DOB outside expected range" if person.dob else "DOB missing or unreadable"
         ws_a.append([person.name, dob_str, note])
-    for person in (gender_anomalies or []):
-        dob_str = (
-            person.dob.strftime("%d %b %Y") if person.dob else f"(unreadable: {person.raw_dob})"
-        )
-        ws_a.append([person.name, dob_str, "Gender missing or invalid"])
+    if gender_anomalies:
+        ws_a.append([])
+        ws_a.append(["── Gender Anomalies ──", "", ""])
+        for person in gender_anomalies:
+            dob_str = (
+                person.dob.strftime("%d %b %Y") if person.dob else f"(unreadable: {person.raw_dob})"
+            )
+            note = f"Gender unrecognised: {person.raw_gender!r}" if person.raw_gender else "Gender missing"
+            ws_a.append([person.name, dob_str, note])
     for col in ws_a.columns:
         max_len = max((len(str(cell.value or "")) for cell in col), default=0)
         ws_a.column_dimensions[col[0].column_letter].width = max_len + 4

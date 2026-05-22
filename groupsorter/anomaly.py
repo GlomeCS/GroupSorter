@@ -10,6 +10,7 @@ class Person:
     dob: date | None      # None if the DOB cell was blank or unparseable
     raw_dob: str = ""     # original cell value, for display when dob is None
     gender: str | None = None  # "M", "F", or None (not loaded / blank / invalid)
+    raw_gender: str = ""  # original cell value, for display when gender is None
 
 
 def find_anomalies(
@@ -56,5 +57,6 @@ def format_gender_anomaly_report(anomalies: list[Person]) -> str:
     ]
     for p in anomalies:
         dob_str = p.dob.strftime("%d %b %Y") if p.dob else "(unknown DOB)"
-        lines.append(f"  {p.name}  —  DOB: {dob_str}  —  Gender: (missing)")
+        gender_str = f"(unrecognised: {p.raw_gender!r})" if p.raw_gender else "(missing)"
+        lines.append(f"  {p.name}  —  DOB: {dob_str}  —  Gender: {gender_str}")
     return "\n".join(lines)

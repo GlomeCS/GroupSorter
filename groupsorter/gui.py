@@ -422,11 +422,14 @@ class App(tk.Tk):
         self._last_anomalies = anomalies
         self._last_gender_anomalies = gender_anomalies
 
+        male_g = female_g = 0
+        if gender_mode == "isolated":
+            male_g, female_g = gender_allocation(valid, num_groups)
+
         # Warn about isolated-mode fallbacks
         fell_back = False
         if mode == "isolated":
             if gender_mode == "isolated":
-                male_g, female_g = gender_allocation(valid, num_groups)
                 male_valid = [p for p in valid if p.gender == "M"]
                 female_valid = [p for p in valid if p.gender == "F"]
                 if (male_g > 0 and isolated_would_fall_back(male_valid, start, end, male_g)) or \
@@ -448,7 +451,6 @@ class App(tk.Tk):
 
         # Warn if one gender gets zero groups in isolated gender mode
         if gender_mode == "isolated":
-            male_g, female_g = gender_allocation(valid, num_groups)
             if male_g == 0 or female_g == 0:
                 absent = "male" if male_g == 0 else "female"
                 messagebox.showwarning(
@@ -474,7 +476,8 @@ class App(tk.Tk):
             self._append(f"\n── {count} gender {label} excluded ──\n")
             for p in gender_anomalies:
                 dob_str = p.dob.strftime("%d %b %Y") if p.dob else "(unknown DOB)"
-                self._append(f"  {p.name}  —  Gender: (missing)\n")
+                gender_str = f"(unrecognised: {p.raw_gender!r})" if p.raw_gender else "(missing)"
+                self._append(f"  {p.name}  —  Gender: {gender_str}\n")
 
     def _export(self) -> None:
         if not self._last_groups and not self._last_anomalies and not self._last_gender_anomalies:
