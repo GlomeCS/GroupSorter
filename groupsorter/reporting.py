@@ -45,7 +45,10 @@ def format_groups_report(
     if mode == "mixed":
         age_label = "Mixed (age ranges distributed)"
     elif fell_back:
-        age_label = "Isolated → fell back to Mixed (more sub-ranges than groups)"
+        if gender_mode == "isolated":
+            age_label = "Isolated (partial fallback to Mixed — one or both gender groups)"
+        else:
+            age_label = "Isolated → fell back to Mixed (more sub-ranges than groups)"
     else:
         age_label = "Isolated (one age range per group)"
 
@@ -85,16 +88,20 @@ def format_excluded_report(
     if dob_anomalies:
         count = len(dob_anomalies)
         label = "anomaly" if count == 1 else "anomalies"
-        lines.append(f"\n── {count} DOB {label} excluded ──")
+        lines.append(f"── {count} DOB {label} excluded ──")
         for p in dob_anomalies:
-            dob_str = p.dob.strftime("%d %b %Y") if p.dob else f"(unreadable: {p.raw_dob})"
+            dob_str = p.dob.strftime("%d %b %Y") if p.dob else f"(unreadable: {p.raw_dob!r})"
             lines.append(f"  {p.name}  —  {dob_str}")
     if gender_anomalies:
+        if lines:
+            lines.append("")
         count = len(gender_anomalies)
         label = "anomaly" if count == 1 else "anomalies"
-        lines.append(f"\n── {count} gender {label} excluded ──")
+        lines.append(f"── {count} gender {label} excluded ──")
         for p in gender_anomalies:
             dob_str = p.dob.strftime("%d %b %Y") if p.dob else "(unknown DOB)"
             gender_str = f"(unrecognised: {p.raw_gender!r})" if p.raw_gender else "(missing)"
             lines.append(f"  {p.name}  —  DOB: {dob_str}  —  Gender: {gender_str}")
-    return "\n".join(lines)
+    if not lines:
+        return ""
+    return "\n" + "\n".join(lines) + "\n"
