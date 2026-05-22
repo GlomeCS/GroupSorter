@@ -187,7 +187,11 @@ def export_results(
             dob_str = (
                 person.dob.strftime("%d %b %Y") if person.dob else f"(unreadable: {person.raw_dob})"
             )
-            note = f"Gender unrecognised: {person.raw_gender!r}" if person.raw_gender else "Gender missing"
+            note = (
+                f"Gender unrecognised: {person.raw_gender!r}"
+                if person.raw_gender
+                else "Gender missing"
+            )
             ws_a.append([person.name, dob_str, note])
     for col in ws_a.columns:
         max_len = max((len(str(cell.value or "")) for cell in col), default=0)
