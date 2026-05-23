@@ -103,6 +103,26 @@ class TestFellBack:
         result = run_sort(people, START, END, 1, "isolated", None)
         assert result.fell_back is True
 
+    def test_fell_back_false_single_occupied_band(self):
+        # All people in one sub-range; empty bands must not count toward fallback threshold
+        people = make_people(4, 0)
+        result = run_sort(people, START, END, 2, "isolated", None)
+        assert result.fell_back is False
+
+    def test_fell_back_true_compound_gender_isolated(self):
+        # Males span both sub-ranges but only 1 male group allocated → falls back
+        males = make_people(2, 2, "M")   # 2 in sub-range 1, 2 in sub-range 2
+        females = make_people(4, 0, "F") # all in sub-range 1
+        result = run_sort(males + females, START, END, 2, "isolated", "isolated")
+        assert result.fell_back is True
+
+    def test_fell_back_false_compound_gender_isolated(self):
+        # Each gender confined to one sub-range; 1 group each → no fallback
+        males = [person(f"M{i}", date(2011, 7, i + 1), "M") for i in range(4)]
+        females = [person(f"F{i}", date(2012, 7, i + 1), "F") for i in range(4)]
+        result = run_sort(males + females, START, END, 2, "isolated", "isolated")
+        assert result.fell_back is False
+
 
 class TestGenderAlloc:
     def test_none_when_gender_mode_is_none(self):
@@ -131,6 +151,16 @@ class TestGenderAlloc:
         result = run_sort(males + females, START, END, 4, "mixed", "isolated")
         assert result.gender_alloc is not None
         assert sum(result.gender_alloc) == 4
+
+    def test_gender_alloc_all_male(self):
+        males = make_people(4, 4, "M")
+        result = run_sort(males, START, END, 4, "mixed", "isolated")
+        assert result.gender_alloc == (4, 0)
+
+    def test_gender_alloc_all_female(self):
+        females = make_people(4, 4, "F")
+        result = run_sort(females, START, END, 4, "mixed", "isolated")
+        assert result.gender_alloc == (0, 4)
 
 
 class TestTotalPreservation:

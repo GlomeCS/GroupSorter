@@ -5,14 +5,10 @@ from __future__ import annotations
 from datetime import date
 
 from .domain import Person
-from .reporting import format_anomaly_report, format_gender_anomaly_report
 
 __all__ = [
-    "Person",
     "find_anomalies",
     "find_gender_anomalies",
-    "format_anomaly_report",
-    "format_gender_anomaly_report",
 ]
 
 

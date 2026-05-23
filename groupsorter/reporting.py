@@ -91,7 +91,7 @@ def format_excluded_report(
         lines.append(f"── {count} DOB {label} excluded ──")
         for p in dob_anomalies:
             dob_str = p.dob.strftime("%d %b %Y") if p.dob else f"(unreadable: {p.raw_dob!r})"
-            lines.append(f"  {p.name}  —  {dob_str}")
+            lines.append(f"  {p.name}  —  DOB: {dob_str}")
     if gender_anomalies:
         if lines:
             lines.append("")

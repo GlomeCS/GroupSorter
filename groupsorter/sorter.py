@@ -8,13 +8,11 @@ from datetime import date
 from .anomaly import find_anomalies, find_gender_anomalies
 from .date_utils import sub_ranges
 from .domain import Person
-from .reporting import format_groups_report
 
 __all__ = [
     "SortResult",
     "run_sort",
     "sort_groups",
-    "format_groups_report",
 ]
 
 
