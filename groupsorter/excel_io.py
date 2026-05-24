@@ -137,7 +137,10 @@ def _parse_dob(value: object) -> tuple[date | None, str]:
     if isinstance(value, date):
         return value, str(value)
     raw = str(value).strip()
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d %b %Y", "%d %B %Y", "%b %d, %Y", "%B %d, %Y"):
+    for fmt in (
+        "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y",
+        "%d %b %Y", "%d %B %Y", "%b %d, %Y", "%B %d, %Y",
+    ):
         try:
             return datetime.strptime(raw, fmt).date(), raw
         except ValueError:
@@ -165,7 +168,10 @@ def export_results(
             headers.append("Gender")
         ws.append(headers)
         for person in group:
-            dob_str = f"{person.dob.strftime('%b')} {person.dob.day}, {person.dob.year}" if person.dob else person.raw_dob
+            dob_str = (
+                f"{person.dob.strftime('%b')} {person.dob.day}, {person.dob.year}"
+                if person.dob else person.raw_dob
+            )
             row: list[object] = [person.name, dob_str]
             if include_gender:
                 row.append(person.gender or "")
@@ -178,7 +184,8 @@ def export_results(
     ws_a.append(["Name", "Date of Birth", "Note"])
     for person in anomalies:
         dob_str = (
-            f"{person.dob.strftime('%b')} {person.dob.day}, {person.dob.year}" if person.dob else f"(unreadable: {person.raw_dob})"
+            f"{person.dob.strftime('%b')} {person.dob.day}, {person.dob.year}"
+            if person.dob else f"(unreadable: {person.raw_dob})"
         )
         note = "DOB outside expected range" if person.dob else "DOB missing or unreadable"
         ws_a.append([person.name, dob_str, note])
@@ -187,7 +194,8 @@ def export_results(
         ws_a.append(["── Gender Anomalies ──", "", ""])
         for person in gender_anomalies:
             dob_str = (
-                f"{person.dob.strftime('%b')} {person.dob.day}, {person.dob.year}" if person.dob else f"(unreadable: {person.raw_dob})"
+                f"{person.dob.strftime('%b')} {person.dob.day}, {person.dob.year}"
+            if person.dob else f"(unreadable: {person.raw_dob})"
             )
             note = (
                 f"Gender unrecognised: {person.raw_gender!r}"
