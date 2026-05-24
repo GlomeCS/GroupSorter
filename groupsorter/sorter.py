@@ -2,10 +2,79 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
 
-from .anomaly import Person
+from .anomaly import find_anomalies, find_gender_anomalies
 from .date_utils import sub_ranges
+from .domain import Person
+
+__all__ = [
+    "SortResult",
+    "run_sort",
+    "sort_groups",
+]
+
+
+@dataclass
+class SortResult:
+    groups: list[list[Person]]
+    dob_anomalies: list[Person]
+    gender_anomalies: list[Person]
+    fell_back: bool
+    gender_alloc: tuple[int, int] | None  # (male_groups, female_groups) or None
+
+
+def run_sort(
+    people: list[Person],
+    start: date,
+    end: date,
+    num_groups: int,
+    age_mode: str,
+    gender_mode: str | None,
+) -> SortResult:
+    """Run the full sort pipeline: anomaly exclusion → sort → structured result.
+
+    Callers pass the raw people list; this function excludes anomalies internally
+    and returns them alongside the sorted groups.
+    """
+    dob_anomalies = find_anomalies(people, start, end)
+    anomaly_ids = {id(p) for p in dob_anomalies}
+    valid = [p for p in people if id(p) not in anomaly_ids]
+
+    gender_anomalies: list[Person] = []
+    gender_alloc: tuple[int, int] | None = None
+    if gender_mode is not None:
+        gender_anomalies = find_gender_anomalies(valid)
+        gender_anomaly_ids = {id(p) for p in gender_anomalies}
+        valid = [p for p in valid if id(p) not in gender_anomaly_ids]
+
+    if gender_mode == "isolated":
+        alloc = _gender_allocation(valid, num_groups, start, end)
+        gender_alloc = alloc
+
+    fell_back = False
+    if age_mode == "isolated":
+        if gender_mode == "isolated" and gender_alloc is not None:
+            male_valid = [p for p in valid if p.gender == "M"]
+            female_valid = [p for p in valid if p.gender == "F"]
+            male_g, female_g = gender_alloc
+            fell_back = (
+                (male_g > 0 and _isolated_would_fall_back(male_valid, start, end, male_g))
+                or (female_g > 0 and _isolated_would_fall_back(female_valid, start, end, female_g))
+            )
+        else:
+            fell_back = _isolated_would_fall_back(valid, start, end, num_groups)
+
+    groups = sort_groups(valid, start, end, num_groups, age_mode, gender_mode)
+
+    return SortResult(
+        groups=groups,
+        dob_anomalies=dob_anomalies,
+        gender_anomalies=gender_anomalies,
+        fell_back=fell_back,
+        gender_alloc=gender_alloc,
+    )
 
 
 def sort_groups(
@@ -205,16 +274,12 @@ def _proportional_allocate(counts: list[int], total_slots: int) -> list[int]:
     return floored
 
 
-def isolated_would_fall_back(
+def _isolated_would_fall_back(
     people: list[Person],
     start_date: date,
     end_date: date,
     num_groups: int,
 ) -> bool:
-    """Return True if isolated mode would fall back to mixed for the given inputs.
-
-    Isolated mode falls back when there are more non-empty sub-ranges than groups.
-    """
     bands = sub_ranges(start_date, end_date)
     non_empty_count = sum(
         1 for band_start, band_end in bands
@@ -223,16 +288,12 @@ def isolated_would_fall_back(
     return non_empty_count > num_groups
 
 
-def gender_allocation(
+def _gender_allocation(
     people: list[Person],
     num_groups: int,
     start_date: date,
     end_date: date,
 ) -> tuple[int, int]:
-    """Return (male_groups, female_groups) for isolated gender mode.
-
-    Mirrors sort_groups: only people with a valid DOB within the date range are counted.
-    """
     male_count = sum(
         1 for p in people
         if p.gender == "M" and p.dob is not None and start_date <= p.dob <= end_date
@@ -243,44 +304,3 @@ def gender_allocation(
     )
     allocs = _proportional_allocate([male_count, female_count], num_groups)
     return allocs[0], allocs[1]
-
-
-def format_groups_report(
-    groups: list[list[Person]],
-    mode: str,
-    fell_back: bool = False,
-    gender_mode: str | None = None,
-) -> str:
-    if mode == "mixed":
-        age_label = "Mixed (age ranges distributed)"
-    elif fell_back:
-        age_label = "Isolated → fell back to Mixed (more sub-ranges than groups)"
-    else:
-        age_label = "Isolated (one age range per group)"
-
-    lines = [f"Age sort mode: {age_label}"]
-
-    if gender_mode == "mixed":
-        lines.append("Gender sort mode: Mixed (gender spread across groups)")
-    elif gender_mode == "isolated":
-        lines.append("Gender sort mode: Isolated (one gender per group)")
-
-    lines += [f"Groups: {len(groups)}", ""]
-
-    has_gender = any(p.gender is not None for group in groups for p in group)
-
-    for i, group in enumerate(groups, 1):
-        lines.append(f"── Group {i} ({len(group)} {'person' if len(group) == 1 else 'people'}) ──")
-        if group:
-            if has_gender:
-                m_count = sum(1 for p in group if p.gender == "M")
-                f_count = sum(1 for p in group if p.gender == "F")
-                lines.append(f"  [{m_count}M / {f_count}F]")
-            for person in group:
-                dob_str = person.dob.strftime("%d %b %Y") if person.dob else "unknown DOB"
-                gender_str = f" [{person.gender}]" if person.gender else ""
-                lines.append(f"  {person.name}  ({dob_str}){gender_str}")
-        else:
-            lines.append("  (empty)")
-        lines.append("")
-    return "\n".join(lines)

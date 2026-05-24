@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from datetime import date
 
-from groupsorter.anomaly import Person, find_gender_anomalies, format_gender_anomaly_report
+from groupsorter.anomaly import find_gender_anomalies
+from groupsorter.domain import Person
 from groupsorter.excel_io import _parse_gender
-from groupsorter.sorter import gender_allocation, sort_groups
+from groupsorter.reporting import format_gender_anomaly_report
+from groupsorter.sorter import sort_groups
 
 START = date(2011, 7, 1)
 END = date(2013, 6, 30)
@@ -118,41 +120,6 @@ class TestFormatGenderAnomalyReport:
         assert "NONBINARY" in report
         assert "unrecognised" in report
 
-
-# ---------------------------------------------------------------------------
-# gender_allocation
-# ---------------------------------------------------------------------------
-
-class TestGenderAllocation:
-    def test_equal_split(self):
-        people = make_people(10, 10)
-        male_g, female_g = gender_allocation(people, 4, START, END)
-        assert male_g == 2
-        assert female_g == 2
-        assert male_g + female_g == 4
-
-    def test_proportional(self):
-        people = make_people(9, 3)
-        male_g, female_g = gender_allocation(people, 4, START, END)
-        assert male_g > female_g
-        assert male_g + female_g == 4
-
-    def test_one_gender_empty(self):
-        people = make_people(10, 0)
-        male_g, female_g = gender_allocation(people, 4, START, END)
-        assert male_g == 4
-        assert female_g == 0
-
-    def test_out_of_range_dobs_excluded(self):
-        people = make_people(4, 4)
-        # Add people with DOBs outside START/END — should not affect allocation
-        out_of_range = [
-            Person(name="Old", dob=date(2008, 1, 1), gender="M"),
-            Person(name="Young", dob=date(2020, 1, 1), gender="F"),
-        ]
-        male_g, female_g = gender_allocation(people + out_of_range, 4, START, END)
-        assert male_g == 2
-        assert female_g == 2
 
 
 # ---------------------------------------------------------------------------

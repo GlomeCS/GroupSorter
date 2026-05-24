@@ -9,14 +9,9 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from openpyxl import Workbook
 
-from .anomaly import (
-    Person,
-    find_anomalies,
-    find_gender_anomalies,
-    format_anomaly_report,
-    format_gender_anomaly_report,
-)
+from .anomaly import find_anomalies, find_gender_anomalies
 from .date_utils import AgeGroup, sub_ranges, suggested_age_groups
+from .domain import Person
 from .excel_io import (
     column_headers,
     export_results,
@@ -25,12 +20,13 @@ from .excel_io import (
     read_people,
     sheet_names,
 )
-from .sorter import (
+from .reporting import (
+    format_anomaly_report,
+    format_excluded_report,
+    format_gender_anomaly_report,
     format_groups_report,
-    gender_allocation,
-    isolated_would_fall_back,
-    sort_groups,
 )
+from .sorter import run_sort
 
 _GENDER_NONE = "(none — no gender sorting)"
 
@@ -408,54 +404,32 @@ class App(tk.Tk):
 
         self._last_start = start
         self._last_end = end
-        mode = self._mode_var.get()
+        age_mode = self._mode_var.get()
+        gender_mode: str | None = (
+            self._gender_mode_var.get() if self._gender_col_var.get() != _GENDER_NONE else None
+        )
 
-        # Exclude DOB anomalies
-        anomalies = find_anomalies(self._people, start, end)
-        anomaly_ids = {id(p) for p in anomalies}
-        valid = [p for p in self._people if id(p) not in anomaly_ids]
+        result = run_sort(self._people, start, end, num_groups, age_mode, gender_mode)
+        self._last_groups = result.groups
+        self._last_anomalies = result.dob_anomalies
+        self._last_gender_anomalies = result.gender_anomalies
 
-        # Exclude gender anomalies if a gender column is active
-        gender_mode: str | None = None
-        gender_anomalies: list[Person] = []
-        if self._gender_col_var.get() != _GENDER_NONE:
-            gender_anomalies = find_gender_anomalies(valid)
-            gender_anomaly_ids = {id(p) for p in gender_anomalies}
-            valid = [p for p in valid if id(p) not in gender_anomaly_ids]
-            gender_mode = self._gender_mode_var.get()
-
-        self._last_anomalies = anomalies
-        self._last_gender_anomalies = gender_anomalies
-
-        male_g = female_g = 0
-        if gender_mode == "isolated":
-            male_g, female_g = gender_allocation(valid, num_groups, start, end)
-
-        # Warn about isolated-mode fallbacks
-        fell_back = False
-        if mode == "isolated":
+        if result.fell_back:
             if gender_mode == "isolated":
-                male_valid = [p for p in valid if p.gender == "M"]
-                female_valid = [p for p in valid if p.gender == "F"]
-                if (male_g > 0 and isolated_would_fall_back(male_valid, start, end, male_g)) or \
-                   (female_g > 0 and isolated_would_fall_back(female_valid, start, end, female_g)):
-                    fell_back = True
-                    messagebox.showwarning(
-                        "Isolated mode fallback",
-                        "Within one or both gender groups, there are more age sub-ranges than\n"
-                        "allocated groups. Isolated age mode will fall back to mixed for those.",
-                    )
+                messagebox.showwarning(
+                    "Isolated mode fallback",
+                    "Within one or both gender groups, there are more age sub-ranges than\n"
+                    "allocated groups. Isolated age mode will fall back to mixed for those.",
+                )
             else:
-                if isolated_would_fall_back(valid, start, end, num_groups):
-                    fell_back = True
-                    messagebox.showwarning(
-                        "Isolated mode fallback",
-                        "There are more non-empty age sub-ranges than groups.\n"
-                        "Isolated mode will fall back to mixed distribution.",
-                    )
+                messagebox.showwarning(
+                    "Isolated mode fallback",
+                    "There are more non-empty age sub-ranges than groups.\n"
+                    "Isolated mode will fall back to mixed distribution.",
+                )
 
-        # Warn if one or both genders get zero groups in isolated gender mode
-        if gender_mode == "isolated":
+        if gender_mode == "isolated" and result.gender_alloc is not None:
+            male_g, female_g = result.gender_alloc
             if male_g == 0 and female_g == 0:
                 messagebox.showwarning(
                     "Gender allocation warning",
@@ -469,25 +443,10 @@ class App(tk.Tk):
                     f"All groups will be allocated to the other gender.",
                 )
 
-        self._last_groups = sort_groups(valid, start, end, num_groups, mode, gender_mode)
-        self._display(format_groups_report(self._last_groups, mode, fell_back, gender_mode))
-
-        if anomalies:
-            count = len(anomalies)
-            label = "anomaly" if count == 1 else "anomalies"
-            self._append(f"\n── {count} DOB {label} excluded ──\n")
-            for p in anomalies:
-                dob_str = p.dob.strftime("%d %b %Y") if p.dob else f"(unreadable: {p.raw_dob})"
-                self._append(f"  {p.name}  —  {dob_str}\n")
-
-        if gender_anomalies:
-            count = len(gender_anomalies)
-            label = "anomaly" if count == 1 else "anomalies"
-            self._append(f"\n── {count} gender {label} excluded ──\n")
-            for p in gender_anomalies:
-                dob_str = p.dob.strftime("%d %b %Y") if p.dob else "(unknown DOB)"
-                gender_str = f"(unrecognised: {p.raw_gender!r})" if p.raw_gender else "(missing)"
-                self._append(f"  {p.name}  —  DOB: {dob_str}  —  Gender: {gender_str}\n")
+        self._display(format_groups_report(result.groups, age_mode, result.fell_back, gender_mode))
+        excluded = format_excluded_report(result.dob_anomalies, result.gender_anomalies)
+        if excluded:
+            self._append(excluded)
 
     def _export(self) -> None:
         if not self._last_groups and not self._last_anomalies and not self._last_gender_anomalies:
