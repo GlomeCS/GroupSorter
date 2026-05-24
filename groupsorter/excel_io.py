@@ -128,6 +128,12 @@ def _parse_gender(value: object) -> tuple[str | None, str]:
     return None, raw
 
 
+_DATE_FORMATS = (
+    "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y",
+    "%d %b %Y", "%d %B %Y", "%b %d, %Y", "%B %d, %Y",
+)
+
+
 def _parse_dob(value: object) -> tuple[date | None, str]:
     """Try to parse a cell value as a date. Returns (date_or_None, raw_string)."""
     if value is None:
@@ -137,10 +143,7 @@ def _parse_dob(value: object) -> tuple[date | None, str]:
     if isinstance(value, date):
         return value, str(value)
     raw = str(value).strip()
-    for fmt in (
-        "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y",
-        "%d %b %Y", "%d %B %Y", "%b %d, %Y", "%B %d, %Y",
-    ):
+    for fmt in _DATE_FORMATS:
         try:
             return datetime.strptime(raw, fmt).date(), raw
         except ValueError:

@@ -37,15 +37,14 @@ _BANDS = [
 
 
 def current_school_year_start(today: date | None = None) -> int:
-    """Return the school year start year to use for group planning.
+    """Return the school year start year based on the July 1 cutoff.
 
-    Jan–Jun of year Y → returns Y (plan ahead for the upcoming school year).
-    Jul–Dec of year Y → returns Y (current school year in session).
-    e.g. called in May 2026 → returns 2026 (upcoming Sep 2026 intake).
+    Jul–Dec of year Y → school year Y started in July → returns Y.
+    Jan–Jun of year Y → still in school year Y-1 → returns Y-1.
     """
     if today is None:
         today = date.today()
-    return today.year
+    return today.year if today.month >= 7 else today.year - 1
 
 
 def suggested_age_groups(school_year_start: int | None = None) -> list[AgeGroup]:

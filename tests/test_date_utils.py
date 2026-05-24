@@ -10,10 +10,10 @@ class TestCurrentSchoolYearStart:
         assert current_school_year_start(date(2025, 7, 1)) == 2025
 
     def test_before_july_1(self):
-        assert current_school_year_start(date(2026, 3, 28)) == 2026
+        assert current_school_year_start(date(2026, 3, 28)) == 2025
 
     def test_june_30(self):
-        assert current_school_year_start(date(2025, 6, 30)) == 2025
+        assert current_school_year_start(date(2025, 6, 30)) == 2024
 
     def test_december(self):
         assert current_school_year_start(date(2025, 12, 1)) == 2025
