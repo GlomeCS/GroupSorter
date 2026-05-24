@@ -21,7 +21,7 @@ class AgeGroup:
 
 
 def _fmt(d: date) -> str:
-    return f"{d.day} {d.strftime('%b %Y')}"
+    return f"{d.strftime('%b')} {d.day}, {d.year}"
 
 
 # Fixed age bands: (label, ages_str, older_age, younger_age)
