@@ -10,7 +10,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from openpyxl import Workbook
 
 from .anomaly import find_anomalies, find_gender_anomalies
-from .date_utils import AgeGroup, sub_ranges, suggested_age_groups
+from .date_utils import AgeGroup, current_school_year_start, sub_ranges, suggested_age_groups
 from .domain import Person
 from .excel_io import (
     column_headers,
@@ -48,7 +48,8 @@ class App(tk.Tk):
         self._last_end: date | None = None
         self._custom_mode = False
 
-        self._age_groups: list[AgeGroup] = suggested_age_groups()
+        self._school_year_var = tk.IntVar(value=current_school_year_start())
+        self._age_groups: list[AgeGroup] = suggested_age_groups(current_school_year_start())
 
         self._build_ui()
 
@@ -117,13 +118,22 @@ class App(tk.Tk):
         ag_frame = ttk.LabelFrame(self, text="3. Age Group / Date Range")
         ag_frame.pack(fill="x", **pad)
 
+        ttk.Label(ag_frame, text="School year:").grid(row=0, column=0, sticky="w", padx=8, pady=4)
+        year_sb = ttk.Spinbox(
+            ag_frame, from_=2020, to=2040, textvariable=self._school_year_var,
+            width=6, command=self._on_school_year_changed,
+        )
+        year_sb.grid(row=0, column=1, sticky="w", padx=4, pady=4)
+        year_sb.bind("<Return>", lambda _: self._on_school_year_changed())
+        year_sb.bind("<FocusOut>", lambda _: self._on_school_year_changed())
+
         self._age_group_var = tk.StringVar()
         ag_labels = [str(g) for g in self._age_groups] + ["Custom…"]
         self._age_group_cb = ttk.Combobox(
             ag_frame, textvariable=self._age_group_var, values=ag_labels,
             state="readonly", width=60
         )
-        self._age_group_cb.grid(row=0, column=0, columnspan=4, sticky="w", padx=8, pady=6)
+        self._age_group_cb.grid(row=1, column=0, columnspan=4, sticky="w", padx=8, pady=6)
         self._age_group_cb.bind("<<ComboboxSelected>>", self._on_age_group_selected)
         self._age_group_cb.current(0)
 
@@ -144,7 +154,7 @@ class App(tk.Tk):
         self._split_hint_lbl = ttk.Label(
             ag_frame, textvariable=self._split_hint_var, foreground="#555"
         )
-        self._split_hint_lbl.grid(row=2, column=0, columnspan=4, sticky="w", padx=8, pady=2)
+        self._split_hint_lbl.grid(row=3, column=0, columnspan=4, sticky="w", padx=8, pady=2)
         self._update_split_hint()
 
         # ── Sort settings ────────────────────────────────────────────
@@ -320,11 +330,25 @@ class App(tk.Tk):
             f"Loaded {len(self._people)} people from '{self._sheet_var.get()}'{gender_note}."
         )
 
+    def _on_school_year_changed(self) -> None:
+        try:
+            year = int(self._school_year_var.get())
+        except (ValueError, tk.TclError):
+            return
+        self._age_groups = suggested_age_groups(year)
+        ag_labels = [str(g) for g in self._age_groups] + ["Custom…"]
+        self._age_group_cb.configure(values=ag_labels)
+        self._age_group_cb.current(0)
+        self._custom_mode = False
+        self._custom_frame.grid_forget()
+        self._invalidate()
+        self._update_split_hint()
+
     def _on_age_group_selected(self, _event=None) -> None:
         selection = self._age_group_var.get()
         if selection == "Custom…":
             self._custom_mode = True
-            self._custom_frame.grid(row=1, column=0, columnspan=4, sticky="w", padx=8, pady=4)
+            self._custom_frame.grid(row=2, column=0, columnspan=4, sticky="w", padx=8, pady=4)
         else:
             self._custom_mode = False
             self._custom_frame.grid_forget()

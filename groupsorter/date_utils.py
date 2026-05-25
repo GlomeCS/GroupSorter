@@ -21,7 +21,7 @@ class AgeGroup:
 
 
 def _fmt(d: date) -> str:
-    return f"{d.day} {d.strftime('%b %Y')}"
+    return f"{d.strftime('%b')} {d.day}, {d.year}"
 
 
 # Fixed age bands: (label, ages_str, older_age, younger_age)
@@ -37,15 +37,14 @@ _BANDS = [
 
 
 def current_school_year_start(today: date | None = None) -> int:
-    """Return the start year of the current school year (July 1 cutoff).
+    """Return the school year start year based on the July 1 cutoff.
 
-    e.g. called in March 2026 → returns 2025 (school year 2025-26).
+    Jul–Dec of year Y → school year Y started in July → returns Y.
+    Jan–Jun of year Y → still in school year Y-1 → returns Y-1.
     """
     if today is None:
         today = date.today()
-    if today.month >= 7:
-        return today.year
-    return today.year - 1
+    return today.year if today.month >= 7 else today.year - 1
 
 
 def suggested_age_groups(school_year_start: int | None = None) -> list[AgeGroup]:

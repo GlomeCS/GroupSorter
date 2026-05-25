@@ -21,24 +21,24 @@ class TestCurrentSchoolYearStart:
 
 class TestSuggestedAgeGroups:
     def test_returns_six_groups(self):
-        groups = suggested_age_groups(2025)
+        groups = suggested_age_groups(2026)
         assert len(groups) == 6
 
     def test_p1_p2_range(self):
-        groups = suggested_age_groups(2025)
+        groups = suggested_age_groups(2026)
         p1p2 = groups[0]
-        assert p1p2.start_date == date(2019, 7, 1)
-        assert p1p2.end_date == date(2021, 6, 30)
+        assert p1p2.start_date == date(2020, 7, 1)
+        assert p1p2.end_date == date(2022, 6, 30)
 
     def test_y11_y13_range(self):
-        groups = suggested_age_groups(2025)
+        groups = suggested_age_groups(2026)
         y11_13 = groups[5]
-        assert y11_13.start_date == date(2008, 7, 1)
-        assert y11_13.end_date == date(2011, 6, 30)
+        assert y11_13.start_date == date(2009, 7, 1)
+        assert y11_13.end_date == date(2012, 6, 30)
 
     def test_ranges_are_contiguous(self):
         from datetime import timedelta
-        groups = suggested_age_groups(2025)
+        groups = suggested_age_groups(2026)
         # Groups are ordered youngest→oldest, so groups[i].start is 1 day after groups[i+1].end
         for i in range(len(groups) - 1):
             assert groups[i].start_date == groups[i + 1].end_date + timedelta(days=1)
